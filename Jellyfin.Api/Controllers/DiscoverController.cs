@@ -1,6 +1,6 @@
 // Jellyfin.Api.Controllers.DiscoverController.cs
 // This file is part of the Discover Feature for Jellyfin.
-// It provides an API controller to search for movies and shows using TMDb.
+// It provides an API controller to search for movies and series using TMDb.
 
 using System;
 using System.Collections.Generic;
@@ -41,10 +41,10 @@ namespace Jellyfin.Api.Controllers
         }
 
         /// <summary>
-        /// Searches for movies and shows based on a query string.
+        /// Searches for movies and series based on a query string.
         /// </summary>
-        /// <param name="query"><see cref="string"/> query to search for movies and shows.</param>
-        /// <param name="maxResults">Maximum number of results to fetch for each type (movies/shows).</param>
+        /// <param name="query"><see cref="string"/> query to search for movies and series.</param>
+        /// <param name="maxResults">Maximum number of results to fetch for each type (movies/series).</param>
         /// <param name="sortBy">Optional. Specify one or more sort orders, comma delimited. Options: Popularity, Name, ProductionYear.</param>
         /// <param name="sortOrder">Sort Order - Ascending, Descending.</param>
         /// <param name="cancellationToken"><see cref="CancellationToken"/> to cancel the operation.</param>
@@ -98,9 +98,9 @@ namespace Jellyfin.Api.Controllers
                 return allResults.Take(pageSize).ToList();
             }
 
-            // Fetch up to maxResults movies and shows
+            // Fetch up to maxResults movies and series
             var movies = await FetchAllResults<Movie, MovieInfo>("TheMovieDb", query, maxResults).ConfigureAwait(false);
-            var shows = await FetchAllResults<Series, SeriesInfo>("TheMovieDb", query, maxResults).ConfigureAwait(false);
+            var series = await FetchAllResults<Series, SeriesInfo>("TheMovieDb", query, maxResults).ConfigureAwait(false);
 
             // Deduplicate by TMDb ID (or fallback to name if missing)
             movies = movies
@@ -108,7 +108,7 @@ namespace Jellyfin.Api.Controllers
                 .Select(g => g.First())
                 .ToList();
 
-            shows = shows
+            series = series
                 .GroupBy(s => s.ProviderIds != null && s.ProviderIds.TryGetValue("Tmdb", out var id) ? id : s.Name)
                 .Select(g => g.First())
                 .ToList();
@@ -138,11 +138,11 @@ namespace Jellyfin.Api.Controllers
                 }
             }
 
-            // Map Shows Results to DiscoverItemDto to match Jellyfin's structure
-            var mappedShows = new List<DiscoverItemDto>();
-            foreach (var s in shows)
+            // Map Series Results to DiscoverItemDto to match Jellyfin's structure
+            var mappedSeries = new List<DiscoverItemDto>();
+            foreach (var s in series)
             {
-                string id = s.Name + "_shows";
+                string id = s.Name + "_series";
                 if (s.ProviderIds != null && s.ProviderIds.TryGetValue("Tmdb", out var tmdbId))
                 {
                     id = tmdbId;
@@ -150,12 +150,12 @@ namespace Jellyfin.Api.Controllers
 
                 if (!string.IsNullOrWhiteSpace(s.ImageUrl))
                 {
-                    mappedShows.Add(new DiscoverItemDto
+                    mappedSeries.Add(new DiscoverItemDto
                     {
                         Id = id,
                         Name = s.Name,
                         ProductionYear = s.ProductionYear,
-                        Type = "Shows",
+                        Type = "Series",
                         PrimaryImageTag = s.ImageUrl,
                         Overview = s.Overview,
                         Popularity = s.Popularity
@@ -230,20 +230,20 @@ namespace Jellyfin.Api.Controllers
                 return ordered ?? items.OrderBy(x => 0); // fallback: no sort
             }
 
-            // Always limit to maxResults items for both movies and shows
+            // Always limit to maxResults items for both movies and series
             mappedMovies = SortItems(mappedMovies).Take(maxResults).ToList();
-            mappedShows = SortItems(mappedShows).Take(maxResults).ToList();
+            mappedSeries = SortItems(mappedSeries).Take(maxResults).ToList();
 
             var result = new
             {
                 Movies = mappedMovies,
-                Shows = mappedShows
+                Series = mappedSeries
             };
 
             Console.WriteLine($"[DiscoverController] mappedMovies: {System.Text.Json.JsonSerializer.Serialize(mappedMovies)}");
-            Console.WriteLine($"[DiscoverController] mappedShows: {System.Text.Json.JsonSerializer.Serialize(mappedShows)}");
+            Console.WriteLine($"[DiscoverController] mappedSeries: {System.Text.Json.JsonSerializer.Serialize(mappedSeries)}");
             Console.WriteLine($"[DiscoverController] result object: {System.Text.Json.JsonSerializer.Serialize(result)}");
-            Console.WriteLine($"[DiscoverController] Returning {mappedMovies.Count} movies and {mappedShows.Count} shows");
+            Console.WriteLine($"[DiscoverController] Returning {mappedMovies.Count} movies and {mappedSeries.Count} series");
             return new JsonResult(result);
         }
     }
